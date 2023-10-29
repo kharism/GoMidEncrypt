@@ -3,6 +3,7 @@ package main_test
 import (
 	"bufio"
 	"fmt"
+	"github/kharism/GoMidEncrypt/client"
 	"github/kharism/GoMidEncrypt/encryption"
 	"net"
 	"testing"
@@ -19,20 +20,46 @@ func DummyServerStart(port string, encDec encryption.EncDec) {
 		if err != nil {
 			fmt.Println(err.Error())
 		}
-		buff := make([]byte, 1024)
-		size, err := conn.Read(buff)
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-		content := buff[:size]
-		plaintext := encDec.Decrypt(content)
-		fmt.Println(plaintext)
-		response := "hello " + string(plaintext)
-		cipher := encDec.Encrypt([]byte(response))
-		conn.Write(cipher)
+		go func(conn net.Conn) {
+			fmt.Println("Accepting connection")
+			bufReader := bufio.NewReader(conn)
+			// buff := make([]byte, 1024)
+			fmt.Println("Start Reading")
+			// size, err := conn.Read(buff)
+			// if err != nil {
+			// 	fmt.Println(err.Error())
+			// }
+			// content := buff[:size]
+			content, _ := bufReader.ReadBytes('\n')
+			// fmt.Println("Decrypting stuff")
+			// fmt.Println(content)
+			fmt.Println("cipher", content)
+			plaintext := encDec.Decrypt(content[:len(content)-1])
+			// plaintext = bytes.TrimRight(plaintext, " ")
+			fmt.Println(string(plaintext))
+			fmt.Println("Encrypting stuff")
+			response := "hello " + string(plaintext) + "\n"
+			cipher := encDec.Encrypt([]byte(response))
+			fmt.Println("writing response")
+			cipher = append(cipher, '\n')
+			conn.Write(cipher)
+			fmt.Println("Done writting response")
+			fmt.Println(">>>>>>>>")
+			conn.Close()
+		}(conn)
+
 	}
 }
 func TestClient(t *testing.T) {
+	aes := encryption.AESEncrypter{Key: "jreosoirppjreosoirppjreosoirppjj", IV: "928304kkrjtiqqdf"}
+	go DummyServerStart(":8088", &aes)
+	client := client.Client{}
+	client.AddressListen = ":8090"
+	client.AddressForward = ":8088"
+	// aes := encryption.AESEncrypter{Key: "jreosoirppjreosoirppjreosoirppjj", IV: "928304kkrjtiqqdf"}
+	client.Encrypter = &aes
+	client.Decrypter = &aes
+	go client.Start()
 	// client := client.Client{}
 	// client.AddressListen = ":8090"
 	// client.AddressForward = ":8088"
